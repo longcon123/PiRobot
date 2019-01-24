@@ -26,7 +26,7 @@ class ee():
 		self.text_out = '' # render huong mat nhin
 		self.side = 0 # kiem tra xem lan cuoi cung mat nhin di dau
 		self.get_eye = False
-		self.get_mouth = True
+		self.get_mouth = False
 		self.x_eye = None
 		self.mouth_cord = None
 		self.kernel = np.ones((3,3), np.uint8)
