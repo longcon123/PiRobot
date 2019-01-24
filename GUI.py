@@ -5,10 +5,10 @@ import imutils
 import dlib
 import cv2
 import numpy as np
-import speech_recognition as sr
+#import speech_recognition as sr
 import threading
 import serial
-import struct
+#import struct
 class ee():
 	def __init__(self, cap, predict):
 		self.cap = cap
@@ -135,18 +135,18 @@ class ee():
 								cv2.putText(frame, self.text_out, (195, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 255), 3)
 		#print self.food, self.change, self.
 		return frame
-	def get_text_from_voice(self):
-		r = sr.Recognizer()
-		with sr.Microphone() as source:
-			self.output('Ban muon an gi?')
-			r.pause_threshold = 0.5
-			r.threshold_energy = 1500
-			r.adjust_for_ambient_noise(source, durations=1)
-			audio = r.listen(source)
-		try:
-			food = r.recognize_google(audio, lang='vi-VN')
-		except:
-			pass
+	#def get_text_from_voice(self):
+		#r = sr.Recognizer()
+		#with sr.Microphone() as source:
+			#self.output('Ban muon an gi?')
+			#r.pause_threshold = 0.5
+			#r.threshold_energy = 1500
+			#r.adjust_for_ambient_noise(source, durations=1)
+			#audio = r.listen(source)
+		#try:
+			#food = r.recognize_google(audio, lang='vi-VN')
+		#except:
+			#pass
 	def get_aspect_ratio(self, obj):
 		A = distance.euclidean(obj[1], obj[5])
 		B = distance.euclidean(obj[2], obj[4])
