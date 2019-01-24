@@ -186,7 +186,7 @@ class ee():
 		cv2.namedWindow('GUI')
 		cv2.setMouseCallback('GUI', self.mouse)
 		sence_menu1 = cv2.imread('menu.jpg')
-		sence_user2 = cv2.imread('rb.png')
+		sence_user2 = cv2.imread('user.jpg')
 		while True:
 			if self.loading == False:				
 				if self.sence == 0:
