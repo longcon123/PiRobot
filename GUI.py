@@ -1,18 +1,19 @@
+# -*- coding: utf8 -*-
 import cv2
 from scipy.spatial import distance
 from imutils import face_utils
 import imutils
 import dlib
-import cv2
 import numpy as np
-#import speech_recognition as sr
-import threading
+import speech_recognition as sr
+from threading import Thread
 import serial
-#import struct
+import struct
+import time
 class ee():
-	def __init__(self, cap, predict):
-		self.cap = cap
-		self.predict = predict
+	def __init__(self):
+		self.cap = cv2.VideoCapture(0)
+		self.predict = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
 		self.food = 0
 		self.flag = 0
 		self.thresh = 0.23 # nguong mo mat/mom
@@ -26,7 +27,7 @@ class ee():
 		self.text_out = '' # render huong mat nhin
 		self.side = 0 # kiem tra xem lan cuoi cung mat nhin di dau
 		self.get_eye = False
-		self.get_mouth = False
+		self.get_mouth = True
 		self.x_eye = None
 		self.mouth_cord = None
 		self.kernel = np.ones((3,3), np.uint8)
@@ -40,8 +41,14 @@ class ee():
 		self.getLR = []
 		self.x_left = 0
 		self.x_right = 0
+		self.time = 0
+		self.x = 50
+		self.y = 0
+		self.check = 0
+		self.ard = serial.Serial('/dev/ttyUSB0', 9600)
+		self.w = True 
 	def original_bgr(self):
-		ret, frame = cap.read()
+		ret, frame = self.cap.read()
 		return frame
 	def get_contours(self, gray):
 		_, thresh = cv2.threshold(gray, 60, 255, cv2.THRESH_BINARY_INV)
@@ -50,7 +57,7 @@ class ee():
 		contours = cv2.findContours(cls, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
 		return contours
 	def get_x_left_right(self, frame):				
-		cv2.putText(frame, 'Nhin toi da sang ben trai', (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 255), 3)
+		cv2.putText(frame, 'Nhin con nguoi toi da sang ben trai va ben phai', (5, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 255), 3)
 		if len(self.getLR) < 60:						
 			self.getLR.append(self.x_eye)
 		else:				
@@ -63,7 +70,7 @@ class ee():
 				print self.x_right, self.x_left
 			else:
 				cv2.putText(frame, 'Chua duoc', (40, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 255), 3)
-	def face_processing(self):		
+	def face_processing(self):	
 		frame = self.original_bgr()
 		frame = imutils.resize(frame, width=450)
 		gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -73,9 +80,29 @@ class ee():
 			shape = face_utils.shape_to_np(shape)
 			eye = shape[self.eStart:self.eEnd]
 			if self.get_mouth == True:
-				mouth = shape[self.mStart:self.mEnd]
+				mouth = shape[self.mStart:self.mEnd]					
 				self.mouth_cord = (mouth[3][0],int((mouth[9][1]+mouth[3][1])/2))
+				#cv2.circle(frame, (mouth[3][0], 170), 4, (0,0,255), -1)
+				cv2.circle(frame, (225, 170), 4, (0,0,255), -1)
 				cv2.circle(frame, self.mouth_cord, 3, (0,255,255), -1)
+				if self.mouth_cord[0] > 215 and self.x < 130:
+					self.x+=1
+				elif self.mouth_cord[0] < 175 and self.x > 0:
+					self.x-=1
+				if 175 < self.mouth_cord[0] < 215:
+					self.x+=0
+					self.time +=1	
+				#if self.mouth_cord[1] < 200 and self.y > 20:
+					#self.y-=1
+				#elif self.mouth_cord[1] > 130 and self.y < 80:
+					#self.y+=1
+				#if 130 < self.mouth_cord[1] < 200 :
+					#self.y+=0
+				if self.time > 50:
+					self.y = 1
+					self.time = 0
+				self.ard.write(struct.pack('>BB',self.x, self.y))
+				print self.time, self.x				
 			else:
 				if self.get_eye == False:
 					eEar = self.get_aspect_ratio(eye)
@@ -135,18 +162,6 @@ class ee():
 								cv2.putText(frame, self.text_out, (195, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 255), 3)
 		#print self.food, self.change, self.
 		return frame
-	#def get_text_from_voice(self):
-		#r = sr.Recognizer()
-		#with sr.Microphone() as source:
-			#self.output('Ban muon an gi?')
-			#r.pause_threshold = 0.5
-			#r.threshold_energy = 1500
-			#r.adjust_for_ambient_noise(source, durations=1)
-			#audio = r.listen(source)
-		#try:
-			#food = r.recognize_google(audio, lang='vi-VN')
-		#except:
-			#pass
 	def get_aspect_ratio(self, obj):
 		A = distance.euclidean(obj[1], obj[5])
 		B = distance.euclidean(obj[2], obj[4])
@@ -156,8 +171,8 @@ class ee():
 	def control_arduino(self, port):
 		ard = serial.Serial(port,9600)
 		data = str(self.food_index)
-		while True:
-			ard.write(struct.pack('>BBB',data,self))
+		#while True:
+			#ard.write(struct.pack('>BB',)
 	def button(self, img, x, y, w, h, text):
 		cv2.rectangle(img, (x,y), (w, h), (100,90,100), -1)
 		cv2.putText(img, text, (20, 13), cv2.FONT_HERSHEY_COMPLEX, 0.5, (100,170,250), 2)
@@ -169,8 +184,10 @@ class ee():
 					self.sence = 5
 			elif 160 <= x <= 448 and 330 <= y <= 390:
 				if event == cv2.EVENT_LBUTTONDOWN:
+					self.cap.release()					
+					cv2.destroyAllWindows()					
 					exit()
-			elif 160 <= x < 448 and 250 <= x <= 312:
+			elif 160 <= x < 448 and 250 <= y <= 312:
 				if event == cv2.EVENT_LBUTTONDOWN:			
 					self.sence = 2
 		elif self.sence == 2:
@@ -183,6 +200,8 @@ class ee():
 				if event == cv2.EVENT_LBUTTONDOWN:
 					self.sence = 1
 	def display(self, food):
+		global v
+		v = False
 		cv2.namedWindow('GUI')
 		cv2.setMouseCallback('GUI', self.mouse)
 		sence_menu1 = cv2.imread('menu.jpg')
@@ -192,10 +211,12 @@ class ee():
 				if self.sence == 0:
 					cv2.imshow('GUI', self.original_bgr())
 				elif self.sence == 5:
+					v = True
 					im = self.face_processing()
 					bt = self.button(im, 0, 0, 80, 20, 'EXIT')
 					cv2.imshow('GUI', bt)
-					cv2.imshow('GUI1', food[self.food])
+					#cv2.putText(food[self.food], self.text_out, (195, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 3)
+					#cv2.imshow('GUI1', food[self.food])
 				elif self.sence == 1:
 					cv2.imshow('GUI', sence_menu1)
 				elif self.sence == 2:
@@ -208,10 +229,29 @@ class ee():
 			else:
 				cv2.imshow('GUI', sence_menu1)
 				self.loading = False
-			k = cv2.waitKey(1) & 0xFF
-port_arduino = '/dev/ttyACM0'
-cap = cv2.VideoCapture(0)
-dat_file = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
+			cv2.waitKey(1)
+def voice():
+	while True:
+		r = sr.Recognizer()
+		with sr.Microphone() as source:
+			#print("Listen...")
+			r.pause_threshold = 0.5
+			r.threshold_energy = 1500
+			r.adjust_for_ambient_noise(source, duration=0.5)
+			audio = r.listen(source)
+		try:
+			comand = r.recognize_google(audio, language='vi-VN')
+			#print("Ban noi:" + comand)
+		except	sr.UnknownValueError:
+			pass
 food_img = [cv2.imread('food0.jpg'), cv2.imread('food1.jpg'), cv2.imread('food2.jpg')]
+a = ee()
 if __name__ == "__main__":
-	ee(cap,dat_file).display(food_img)
+	t1 = Thread(target = a.display, args=(food_img,))
+	t2 = Thread(target = voice)
+	t1.setDaemon(True)
+	t2.setDaemon(True)
+	t1.start()
+	t2.start()
+	while True:
+		pass 
