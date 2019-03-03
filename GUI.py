@@ -99,16 +99,20 @@ class ee():
 					self.y = 0
 				if 120 < self.mouth_cord[0] < 280:
 					self.x+=0
-					self.time += 1
 				#if self.mouth_cord[1] < 200 and self.y > 20:
 					#self.y-=1
 				#elif self.mouth_cord[1] > 130 and self.y < 80:
 					#self.y+=1
 				#if 130 < self.mouth_cord[1] < 200 :
 					#self.y+=0
-				if self.time > 60:
+				mEar = distance.euclidean(mouth[3], mouth[9])
+				print(mEar)
+				if mEar > 60:
+					self.time+=1
+				if self.time > 6:
 					self.y = 1
 					self.time = 0
+					print 'OK'
 				else:
 					self.y = 0
 				if self.get_eye == False:
