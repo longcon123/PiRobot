@@ -12,7 +12,7 @@ import struct
 import time
 class ee():
 	def __init__(self):
-		self.cap = cv2.VideoCapture(0)
+		self.cap = cv2.VideoCapture(1)
 		self.predict = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
 		self.food = 0
 		self.flag = 0
@@ -26,7 +26,7 @@ class ee():
 		self.flag_chose = 0 # kiem tra xem mat nhin ve huong do theo bao nhieu lau
 		self.text_out = '' # render huong mat nhin
 		self.side = 0 # kiem tra xem lan cuoi cung mat nhin di dau
-		self.get_eye = False
+		self.get_eye = True
 		self.get_mouth = True
 		self.x_eye = None
 		self.mouth_cord = None
@@ -55,9 +55,14 @@ class ee():
 		ero = cv2.erode(thresh, self.kernel, iterations=1)
 		cls = cv2.morphologyEx(ero, cv2.MORPH_CLOSE, self.kernel1)
 		contours = cv2.findContours(cls, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
-		return contours
+		return contours, cls
+	def adjust_gamma(self, im):
+		invGamma = 1.0 / 1.2
+		table = np.array([((i / 255.0) ** invGamma) * 255
+			for i in np.arange(0, 256)]).astype("uint8")
+		return cv2.LUT(im, table)
 	def get_x_left_right(self, frame):				
-		cv2.putText(frame, 'Nhin con nguoi toi da sang ben trai va ben phai', (5, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 255), 3)
+		cv2.putText(frame, 'Nhin con nguoi toi da', (5, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 255), 3)
 		if len(self.getLR) < 60:						
 			self.getLR.append(self.x_eye)
 		else:				
@@ -73,6 +78,7 @@ class ee():
 	def face_processing(self):	
 		frame = self.original_bgr()
 		frame = imutils.resize(frame, width=450)
+		frame = self.adjust_gamma(frame)
 		gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 		subjects = self.detect(gray, 0)
 		for subject in subjects:
@@ -85,25 +91,26 @@ class ee():
 				#cv2.circle(frame, (mouth[3][0], 170), 4, (0,0,255), -1)
 				cv2.circle(frame, (225, 170), 4, (0,0,255), -1)
 				cv2.circle(frame, self.mouth_cord, 3, (0,255,255), -1)
-				if self.mouth_cord[0] > 215 and self.x < 130:
+				if self.mouth_cord[0] > 280 and self.x < 130:
 					self.x+=1
-				elif self.mouth_cord[0] < 175 and self.x > 0:
+					self.y = 0
+				elif self.mouth_cord[0] < 120 and self.x > 0:
 					self.x-=1
-				if 175 < self.mouth_cord[0] < 215:
+					self.y = 0
+				if 120 < self.mouth_cord[0] < 280:
 					self.x+=0
-					self.time +=1	
+					self.time += 1
 				#if self.mouth_cord[1] < 200 and self.y > 20:
 					#self.y-=1
 				#elif self.mouth_cord[1] > 130 and self.y < 80:
 					#self.y+=1
 				#if 130 < self.mouth_cord[1] < 200 :
 					#self.y+=0
-				if self.time > 50:
+				if self.time > 60:
 					self.y = 1
 					self.time = 0
-				self.ard.write(struct.pack('>BB',self.x, self.y))
-				print self.time, self.x				
-			else:
+				else:
+					self.y = 0
 				if self.get_eye == False:
 					eEar = self.get_aspect_ratio(eye)
 					leftEyeHull = cv2.convexHull(eye)
@@ -119,7 +126,7 @@ class ee():
 					cv2.circle(frame, (eye[3][0], eye[3][1]), 1, (0,0,255), -1)
 					roi = frame[eye[2][1]-5:eye[4][1]+5, eye[0][0]-5:eye[3][0]+5]
 					roig = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-					contours = self.get_contours(roig)
+					contours, im = self.get_contours(roig)
 					lengtc = len(contours)
 					if lengtc > 0:
 						area = [0.0]*lengtc
@@ -159,8 +166,8 @@ class ee():
 										if self.food < 0:
 											self.food = 0
 										self.change = False
-								cv2.putText(frame, self.text_out, (195, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 255), 3)
-		#print self.food, self.change, self.
+								cv2.putText(frame, self.text_out, (195, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 255), 3)	
+		self.ard.write(struct.pack('>BBB',self.y, v, self.x))
 		return frame
 	def get_aspect_ratio(self, obj):
 		A = distance.euclidean(obj[1], obj[5])
@@ -182,6 +189,9 @@ class ee():
 			if 160 <= x <= 448 and 90 <= y <= 150:
 				if event == cv2.EVENT_LBUTTONDOWN:
 					self.sence = 5
+			elif 160 <= x <= 448 and 171 <= y <= 232:
+				if event == cv2.EVENT_LBUTTONDOWN:
+					self.sence = 5
 			elif 160 <= x <= 448 and 330 <= y <= 390:
 				if event == cv2.EVENT_LBUTTONDOWN:
 					self.cap.release()					
@@ -191,7 +201,6 @@ class ee():
 				if event == cv2.EVENT_LBUTTONDOWN:			
 					self.sence = 2
 		elif self.sence == 2:
-			print x, y
 			if 0 <= x <= 80 and 0 <= y <= 20:
 				if event == cv2.EVENT_LBUTTONDOWN:
 					self.sence = 1
@@ -201,7 +210,7 @@ class ee():
 					self.sence = 1
 	def display(self, food):
 		global v
-		v = False
+		v = 0
 		cv2.namedWindow('GUI')
 		cv2.setMouseCallback('GUI', self.mouse)
 		sence_menu1 = cv2.imread('menu.jpg')
@@ -211,12 +220,11 @@ class ee():
 				if self.sence == 0:
 					cv2.imshow('GUI', self.original_bgr())
 				elif self.sence == 5:
-					v = True
 					im = self.face_processing()
 					bt = self.button(im, 0, 0, 80, 20, 'EXIT')
 					cv2.imshow('GUI', bt)
-					#cv2.putText(food[self.food], self.text_out, (195, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 3)
-					#cv2.imshow('GUI1', food[self.food])
+					cv2.putText(food[self.food], self.text_out, (195, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 3)
+					cv2.imshow('GUI1', food[self.food])
 				elif self.sence == 1:
 					cv2.imshow('GUI', sence_menu1)
 				elif self.sence == 2:
@@ -231,17 +239,24 @@ class ee():
 				self.loading = False
 			cv2.waitKey(1)
 def voice():
+	global v
 	while True:
 		r = sr.Recognizer()
 		with sr.Microphone() as source:
-			#print("Listen...")
+			print("Listen...")
 			r.pause_threshold = 0.5
 			r.threshold_energy = 1500
 			r.adjust_for_ambient_noise(source, duration=0.5)
 			audio = r.listen(source)
 		try:
 			comand = r.recognize_google(audio, language='vi-VN')
-			#print("Ban noi:" + comand)
+			if u'cơm' in comand:
+				v = 0
+			elif u'rau' in comand:
+				v = 1
+			elif u'thịt' in comand:
+				v = 2			
+			print("Ban noi:" + comand)
 		except	sr.UnknownValueError:
 			pass
 food_img = [cv2.imread('food0.jpg'), cv2.imread('food1.jpg'), cv2.imread('food2.jpg')]
